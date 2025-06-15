@@ -3,21 +3,23 @@ from rest_framework.serializers import (
     CharField,
     EmailField,
     ValidationError,
+    IntegerField,
+    Serializer,
 )
 from django.contrib.auth.password_validation import validate_password
-from .models import User
+from .models import User, Todo
 
 
 class UserSerializer(ModelSerializer):
     email = EmailField()
-    password = CharField(
+    password1 = CharField(
         write_only=True, required=True, style={"input_type": "password"}
     )
-    password1 = CharField(write_only=True, required=True)
+    password2 = CharField(write_only=True, required=True)
 
     class Meta:
         model = User
-        fields = ("username", "email", "password", "password1")
+        fields = ("username", "email", "password1", "password2")
 
     def validate_email(self, data):
         if User.objects.filter(email=data).exists():
@@ -30,19 +32,33 @@ class UserSerializer(ModelSerializer):
         return data
 
     def validate(self, attrs):
-        if attrs["password"] != attrs["password"]:
+        if attrs["password1"] != attrs["password2"]:
             raise ValidationError(detail="password does not match")
         try:
-            validate_password(attrs["password"])
+            validate_password(attrs["password1"])
         except ValidationError as e:
             raise ValidationError(detail=f"Error{e} have occured")
+        return attrs
 
     def create(self, validated_data):
-        validate_password.pop("password2")
+        validated_data.pop("password2")
         user = User.objects.create(
             username=validated_data["username"],
             email=validated_data["email"],
         )
-        user.set_password(validated_data["password"])
+        user.set_password(validated_data["password1"])
 
         return user
+
+
+class TodoSerializer(ModelSerializer):
+    class Meta:
+        model = Todo
+        fields = "__all__"
+
+
+class GetAllTodoSerializer(Serializer):
+    data = TodoSerializer(many=True)
+    page = IntegerField()
+    limit = IntegerField()
+    total = IntegerField()
